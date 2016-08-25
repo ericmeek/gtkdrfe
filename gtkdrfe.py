@@ -15,6 +15,8 @@ class MyWindow(Gtk.Window):
         self.ALT_ON = False
         self.rtmax = 0
         self.rtcounter = 0
+        self.spmax = 0
+        self.spcounter = 0
         self.currenttime = 0
         self.server_time = 0
         self.ICON_HIDDEN = 1001
@@ -22,7 +24,8 @@ class MyWindow(Gtk.Window):
         self.blankimg = None
         self.hideimg = None
         self.posimg = None
-
+        self.invstream = []
+        self.stream = False
 
         Gtk.Window.__init__(self, title="ListBox Demo")
 
@@ -47,6 +50,7 @@ class MyWindow(Gtk.Window):
 
     def do_macro(self, macro):
         print("Doing Macro: {}".format(macro))
+        self.textbuffer2.insert(self.textbuffer2.get_end_iter(), "{}\n".format(macro))
         self.tn.write("{}\n".format(macro))     
 
     def on_key_press(self, widget, ev, data=None):
@@ -113,18 +117,21 @@ class MyWindow(Gtk.Window):
         hb = Gtk.HeaderBar()
         hb.set_show_close_button(False)
         hb.props.title = "Lukrani"
-        image = Gtk.Image.new_from_file("images/lefthand.png")
-
-        label1 = Gtk.Label("Left Hand", xalign=0)
-        label2 = Gtk.Label("Right Hand", xalign=0)
-        label3 = Gtk.Label("Spell", xalign=0)
+        imgleft = Gtk.Image.new_from_file("images/lefthand.png")
+        imgright = Gtk.Image.new_from_file("images/righthand.png")
+        imgwand = Gtk.Image.new_from_file("images/wand.png")
+        self.lbllefthand = Gtk.Label("Empty", xalign=0)
+        self.lblrighthand = Gtk.Label("Empty", xalign=0)
+        self.lblspell = Gtk.Label("None", xalign=0)
 
         btn1 = Gtk.Button(label="Macro Set")
         btn2 = Gtk.Button(label="Options")
-        hb.pack_start(image)
-        hb.pack_start(label1)
-        hb.pack_start(label2)
-        hb.pack_start(label3)
+        hb.pack_start(imgleft)
+        hb.pack_start(self.lbllefthand)
+        hb.pack_start(imgright)
+        hb.pack_start(self.lblrighthand)
+        hb.pack_start(imgwand)
+        hb.pack_start(self.lblspell)
         hb.pack_end(btn1)
         hb.pack_end(btn2)
         return hb
@@ -136,6 +143,9 @@ class MyWindow(Gtk.Window):
         thoughtwindow.set_hexpand(True)
         thoughtwindow.set_vexpand(True)
         thoughtview = Gtk.TextView()
+        thoughtview.set_editable(False)
+        thoughtview.set_cursor_visible(False)
+        thoughtview.set_wrap_mode(Gtk.WrapMode.WORD)
         thoughtbuffer = thoughtview.get_buffer()
         thoughtbuffer.set_text("This is the thought window")
         thoughtwindow.add(thoughtview)
@@ -144,6 +154,9 @@ class MyWindow(Gtk.Window):
         roomwindow.set_hexpand(True)
         roomwindow.set_vexpand(True)
         roomview = Gtk.TextView()
+        roomview.set_editable(False)
+        roomview.set_cursor_visible(False)
+        roomview.set_wrap_mode(Gtk.WrapMode.WORD)
         roombuffer = roomview.get_buffer()
         roombuffer.set_text("This is the room window\n")
         roomwindow.add(roomview)
@@ -164,6 +177,8 @@ class MyWindow(Gtk.Window):
         textview2.set_editable(False)
         textview2.set_cursor_visible(False)
         textview2.set_wrap_mode(Gtk.WrapMode.WORD)
+        textview2.modify_bg(Gtk.StateType.NORMAL, Gdk.Color(0,0,0))
+        textview2.modify_fg(Gtk.StateType.NORMAL, Gdk.Color(65535,65535,65535))
         self.textbuffer2 = textview2.get_buffer()
         self.textbuffer2.set_text("This is the story window\n")
         scrolledwindow2.add(textview2)
@@ -183,34 +198,38 @@ class MyWindow(Gtk.Window):
         self.statusgrid.attach_next_to(self.hideimg, self.posimg, Gtk.PositionType.LEFT, 1, 1)
 
         dirgrid = Gtk.Grid()
-        dirnorth = Gtk.Image.new_from_file("images/north.xpm")
-        dirsouth = Gtk.Image.new_from_file("images/south.xpm")
-        direast = Gtk.Image.new_from_file("images/east.xpm")
-        dirwest = Gtk.Image.new_from_file("images/west.xpm")
-        dirnortheast = Gtk.Image.new_from_file("images/northeast.xpm")
-        dirsoutheast = Gtk.Image.new_from_file("images/southeast.xpm")
-        dirnorthwest = Gtk.Image.new_from_file("images/northwest.xpm")
-        dirsouthwest = Gtk.Image.new_from_file("images/southwest.xpm")
-        dirup = Gtk.Image.new_from_file("images/up.xpm")
-        dirdown = Gtk.Image.new_from_file("images/down.xpm")
-        dirout = Gtk.Image.new_from_file("images/out.xpm")
-        dirgrid.add(dirnorth)
-        dirgrid.attach_next_to(dirnorthwest, dirnorth, Gtk.PositionType.LEFT, 1, 1)
-        dirgrid.attach_next_to(dirnortheast, dirnorth, Gtk.PositionType.RIGHT, 1, 1)
-        dirgrid.attach_next_to(dirwest, dirnorthwest, Gtk.PositionType.BOTTOM, 1, 1)
-        dirgrid.attach_next_to(direast, dirnortheast, Gtk.PositionType.BOTTOM, 1, 1)
-        dirgrid.attach_next_to(dirsouthwest, dirwest, Gtk.PositionType.BOTTOM, 1, 1)
-        dirgrid.attach_next_to(dirsouth, dirsouthwest, Gtk.PositionType.RIGHT, 1, 1)
-        dirgrid.attach_next_to(dirsoutheast, dirsouth, Gtk.PositionType.RIGHT, 1, 1)
-        dirgrid.attach_next_to(dirup, dirnortheast, Gtk.PositionType.RIGHT, 1, 1)
-        dirgrid.attach_next_to(dirout, direast, Gtk.PositionType.RIGHT, 1, 1)
-        dirgrid.attach_next_to(dirdown, dirsoutheast, Gtk.PositionType.RIGHT, 1, 1)
+        self.dirnorth = Gtk.Image.new_from_file("images/north.xpm")
+        self.dirsouth = Gtk.Image.new_from_file("images/south.xpm")
+        self.direast = Gtk.Image.new_from_file("images/east.xpm")
+        self.dirwest = Gtk.Image.new_from_file("images/west.xpm")
+        self.dirnortheast = Gtk.Image.new_from_file("images/northeast.xpm")
+        self.dirsoutheast = Gtk.Image.new_from_file("images/southeast.xpm")
+        self.dirnorthwest = Gtk.Image.new_from_file("images/northwest.xpm")
+        self.dirsouthwest = Gtk.Image.new_from_file("images/southwest.xpm")
+        self.dirup = Gtk.Image.new_from_file("images/up.xpm")
+        self.dirdown = Gtk.Image.new_from_file("images/down.xpm")
+        self.dirout = Gtk.Image.new_from_file("images/out.xpm")
+        self.compassdict= {"north": self.dirnorth, "south": self.dirsouth, "east": self.direast,
+                       "west": self.dirwest, "northeast": self.dirnortheast, "southeast": self.dirsoutheast,
+                       "northwest": self.dirnorthwest, "southwest": self.dirsouthwest, "up": self.dirup,
+                       "down": self.dirdown, "out": self.dirout}
+        dirgrid.add(self.dirnorth)
+        dirgrid.attach_next_to(self.dirnorthwest, self.dirnorth, Gtk.PositionType.LEFT, 1, 1)
+        dirgrid.attach_next_to(self.dirnortheast, self.dirnorth, Gtk.PositionType.RIGHT, 1, 1)
+        dirgrid.attach_next_to(self.dirwest, self.dirnorthwest, Gtk.PositionType.BOTTOM, 1, 1)
+        dirgrid.attach_next_to(self.direast, self.dirnortheast, Gtk.PositionType.BOTTOM, 1, 1)
+        dirgrid.attach_next_to(self.dirsouthwest, self.dirwest, Gtk.PositionType.BOTTOM, 1, 1)
+        dirgrid.attach_next_to(self.dirsouth, self.dirsouthwest, Gtk.PositionType.RIGHT, 1, 1)
+        dirgrid.attach_next_to(self.dirsoutheast, self.dirsouth, Gtk.PositionType.RIGHT, 1, 1)
+        dirgrid.attach_next_to(self.dirup, self.dirnortheast, Gtk.PositionType.RIGHT, 1, 1)
+        dirgrid.attach_next_to(self.dirout, self.direast, Gtk.PositionType.RIGHT, 1, 1)
+        dirgrid.attach_next_to(self.dirdown, self.dirsoutheast, Gtk.PositionType.RIGHT, 1, 1)
 
         rtbox = Gtk.ListBox()
         self.rtpbar = Gtk.ProgressBar()
         rtbox.add(self.rtpbar)
-        sppbar = Gtk.ProgressBar()
-        rtbox.add(sppbar)
+        self.sppbar = Gtk.ProgressBar()
+        rtbox.add(self.sppbar)
         entrytext = Gtk.Entry()
         entrytext.connect('activate', self.entrytext_activate)
         entrytext.connect('realize', self.entrytext_realize)
@@ -264,6 +283,8 @@ class MyWindow(Gtk.Window):
             print("RETURNED")
             if line.prompt:
                 self.textbuffer2.insert(self.textbuffer2.get_end_iter(), ">\n")
+            elif self.stream:
+                pass
             elif line.lines:
                 for line in line.lines:
                     if line:
@@ -308,9 +329,75 @@ class MyWindow(Gtk.Window):
             return False
         return True
 
+    def on_updatespbar(self, data):
+        self.spcounter -= 1
+        fraction = float(self.spcounter) / float(self.spmax)
+        self.sppbar.set_fraction(fraction)
+        print("COUNTER: {}/{} = {}".format(self.spcounter, self.spmax, fraction))
+        if self.spcounter > 0:
+            return True
+        else:
+            self.sppbar.set_fraction(0)
+            return False
+        return True
+
     def server_tick(self, data):
         self.server_time += 1
         return True
+
+    def set_hand(self, hand, item):
+        if hand == "right":
+            self.lblrighthand.set_label(item)
+        elif hand == "left":
+            self.lbllefthand.set_label(item)
+
+    def set_compass(self, line):
+        print("ALL OFF")
+        for k,v in self.compassdict.items():
+            print("SETTING: images/{}.xpm".format(k))
+            v.set_from_file("images/{}.xpm".format(k))
+        dirs = []
+        print("DIRECTION LINE: {}".format(line))
+        while re.match("^<dir value='([a-zA-Z]+?)'/>", line):
+            match = re.match("^<dir value='([a-zA-Z]+?)'/>", line)
+            direction = match.group(1)
+            if direction == "n":
+                dirs.append("north")
+            elif direction == "s":
+                dirs.append("south")
+            elif direction == "e":
+                dirs.append("east")
+            elif direction == "w":
+                dirs.append("west")
+            elif direction == "ne":
+                dirs.append("northeast")
+            elif direction == "se":
+                dirs.append("southeast")
+            elif direction == "nw":
+                dirs.append("northwest")
+            elif direction == "sw":
+                dirs.append("southwest")
+            elif direction == "up":
+                dirs.append("up")
+            elif direction == "down":
+                dirs.append("down")
+            elif direction == "out":
+                dirs.append("out")
+            else:
+                print("NO DIRECTION FOR: {}".format())
+            line = re.sub("^<dir value='([a-zA-Z]+?)'/>", "", line, count=1)
+        print("DIRECTIONS")
+        print("----------")
+        print(line)
+        print(dirs)
+        for k,v in self.compassdict.items():
+            if k in dirs:
+                v.set_from_file("images/{}_on.xpm".format(k))
+            else:
+                v.set_from_file("images/{}.xpm". format(k))
+
+    def set_spell(self, spell):
+        self.lblspell.set_label(spell)
 
     def toggle_icon(self, icon, visible):
         if icon == "HIDDEN":
@@ -387,7 +474,55 @@ class TextLine:
                         mainwindow.server_time = server_time
                     self.prompt = True
                     break
-                    #<right>Empty</right><left exist='54756194' noun='quarterstaff'>ironwood quarterstaff</left><clearStream id='inv' ifClosed=''/><pushStream id='inv'/>
+                elif re.match("^<right>(.+?)</right>", line):
+                    match = re.match("^<right>(.+?)</right>", line)
+                    mainwindow.set_hand("right", match.group(1))
+                    line = re.sub("^<right>(.+?)</right>", "", line)
+                elif re.match("^<left>(.+?)</left>", line):
+                    match = re.match("^<left>(.+?)</left>", line)
+                    mainwindow.set_hand("left", match.group(1))
+                    line = re.sub("^<left>(.+?)</left>", "", line)
+                elif re.match("^<right exist='[0-9]+?' noun='(.+?)'>.+?</right>", line):
+                    match = re.match("^<right exist='[0-9]+?' noun='(.+?)'>.+?</right>", line)
+                    mainwindow.set_hand("right", match.group(1))
+                    line = re.sub("^<right exist='[0-9]+?' noun='(.+?)'>.+?</right>", "", line)
+                elif re.match("^<left exist='[0-9]+?' noun='(.+?)'>.+?</left>", line):
+                    match = re.match("^<left exist='[0-9]+?' noun='(.+?)'>.+?</left>", line)
+                    mainwindow.set_hand("left", match.group(1))
+                    line = re.sub("^<left exist='[0-9]+?' noun='(.+?)'>.+?</left>", "", line)
+                elif re.match("^<spell exist='.+?'>(.+?)</spell>", line):
+                    match = re.match("^<spell exist='.+?'>(.+?)</spell>", line)
+                    mainwindow.set_spell(match.group(1))
+                    line = re.sub("^<spell exist='.+?'>(.+?)</spell>", "", line)
+                elif re.match("^<spell>(.+?)</spell>", line):
+                    match = re.match("^<spell>(.+?)</spell>", line)
+                    mainwindow.set_spell(match.group(1))
+                    line = re.sub("^<spell>(.+?)</spell>", "", line)
+                elif re.match("<castTime value='([0-9]+)'/>", line):
+                    mainwindow.sppbar.set_fraction(1)
+                    objs = re.match("^<castTime value='([0-9]+)'/>", line)
+                    rt = int(objs.group(1)) - mainwindow.server_time
+                    print("******** SP RT: {} ********* ".format(rt))
+                    mainwindow.spcounter = rt
+                    mainwindow.spmax = rt
+                    GObject.timeout_add_seconds(1, mainwindow.on_updatespbar, None)
+                    line = re.sub("^<castTime value='([0-9]+)'/>", "", line, count = 1)
+                elif re.match("^<clearContainer id='stow'/>", line):
+                    line = re.sub("^<clearContainer id='stow'/>", "", line, count = 1)
+                elif re.match("<inv id='stow'>.+?</inv>", line):
+                    line = re.sub("<inv id='stow'>.+?</inv>", "", line, count = 1)
+                elif re.match("^<clearStream id='inv' ifClosed=''/>", line):
+                    line = re.sub("^<clearStream id='inv' ifClosed=''/>", "", line)
+                elif re.match("<pushStream id='inv'/>", line):
+                    mainwindow.stream = True
+                    line = re.sub("<pushStream id='inv'/>", "", line)
+                elif re.match("<popStream/>", line):
+                    mainwindow.stream = False
+                    line = re.sub("<popStream/>", "", line)
+                elif re.match("<compass>(.+)</compass>", line):
+                    match = re.match("<compass>(.+)</compass>", line)
+                    mainwindow.set_compass(match.group(1))
+                    line = re.sub("<compass>(.+)</compass>", "", line)
                 else:
                     unmatched.write("{}\n".format(line))
                     break
