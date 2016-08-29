@@ -26,6 +26,7 @@ class MyWindow(Gtk.Window):
         self.posimg = None
         self.invstream = []
         self.stream = False
+        self.prompt = False
 
         Gtk.Window.__init__(self, title="ListBox Demo")
 
@@ -48,6 +49,21 @@ class MyWindow(Gtk.Window):
 
         GObject.timeout_add_seconds(1, self.server_tick, None)
 
+        self.load_macros()
+
+    def load_macros(self):
+        self.macros_ctrl = {}
+        f = open("macros_ctrl.cf", "r")
+        for line in f.readlines():
+            key,macro = line.strip().split(":")
+            self.macros_ctrl[Gdk.keyval_from_name(key)] = macro
+
+        self.macros_alt = {}
+        f = open("macros_alt.cf", "r")
+        for line in f.readlines():
+            key,macro = line.strip().split(":")
+            self.macros_alt[Gdk.keyval_from_name(key)] = macro
+
     def do_macro(self, macro):
         print("Doing Macro: {}".format(macro))
         self.textbuffer2.insert(self.textbuffer2.get_end_iter(), "{}\n".format(macro))
@@ -58,29 +74,22 @@ class MyWindow(Gtk.Window):
 
         SPECIAL_KEYS = [Gdk.KEY_semicolon, Gdk.KEY_slash, Gdk.KEY_comma]
 
-        macros_ctrl = {Gdk.KEY_o:"north",
-                       Gdk.KEY_l:"south",
-                       Gdk.KEY_semicolon:"east",
-                       Gdk.KEY_k:"west",
-                       Gdk.KEY_slash:"southeast",
-                       Gdk.KEY_comma:"southwest",
-                       Gdk.KEY_p:"northeast",
-                       Gdk.KEY_i:"northwest"}
-
-        if ev.keyval == Gdk.KEY_Control_L:
+        if ev.keyval == Gdk.KEY_Control_L or ev.keyval == Gdk.KEY_Control_R:
             self.CTRL_ON = True
-        elif ev.keyval == Gdk.KEY_Alt_L:
+        elif ev.keyval == Gdk.KEY_Alt_L or ev.keyval == Gdk.KEY_Alt_R:
             self.ALT_ON = True
         elif ev.keyval == Gdk.KEY_Shift_L:
             self.SHIFT_ON = True
         elif ev.keyval in range(Gdk.KEY_A,Gdk.KEY_Z+1) or ev.keyval in range(Gdk.KEY_a,Gdk.KEY_z+1) or ev.keyval in SPECIAL_KEYS:
             ## Ctrl
             if self.CTRL_ON and not self.SHIFT_ON and not self.ALT_ON:
-                if ev.keyval in macros_ctrl:
-                    self.do_macro(macros_ctrl[ev.keyval])
+                if ev.keyval in self.macros_ctrl:
+                    self.do_macro(self.macros_ctrl[ev.keyval])
                 print("Ctrl + {}".format(ev.keyval))
             ## Alt
             if not self.CTRL_ON and not self.SHIFT_ON and self.ALT_ON:
+                if ev.keyval in self.macros_alt:
+                    self.do_macro(self.macros_alt[ev.keyval])
                 print("Alt + {}".format(ev.keyval))
             ## Ctrl Shift
             if self.CTRL_ON and self.SHIFT_ON and not self.ALT_ON:
@@ -103,9 +112,9 @@ class MyWindow(Gtk.Window):
         # Left-Shift 65505
         # Right-Shift 65506
         # Super 65515
-        if ev.keyval == Gdk.KEY_Control_L:
+        if ev.keyval == Gdk.KEY_Control_L or ev.keyval == Gdk.KEY_Control_R:
             self.CTRL_ON = False
-        elif ev.keyval == Gdk.KEY_Alt_L:
+        elif ev.keyval == Gdk.KEY_Alt_L or ev.keyval == Gdk.KEY_Alt_R:
             self.ALT_ON = False
         elif ev.keyval == Gdk.KEY_Shift_L:
             self.SHIFT_ON = False
@@ -146,8 +155,10 @@ class MyWindow(Gtk.Window):
         thoughtview.set_editable(False)
         thoughtview.set_cursor_visible(False)
         thoughtview.set_wrap_mode(Gtk.WrapMode.WORD)
-        thoughtbuffer = thoughtview.get_buffer()
-        thoughtbuffer.set_text("This is the thought window")
+        thoughtview.modify_bg(Gtk.StateType.NORMAL, Gdk.Color(0,0,0))
+        thoughtview.modify_fg(Gtk.StateType.NORMAL, Gdk.Color(65535,65535,65535))
+        self.thoughtbuffer = thoughtview.get_buffer()
+        self.thoughtbuffer.set_text("This is the thought window")
         thoughtwindow.add(thoughtview)
 
         roomwindow = Gtk.ScrolledWindow()
@@ -157,6 +168,8 @@ class MyWindow(Gtk.Window):
         roomview.set_editable(False)
         roomview.set_cursor_visible(False)
         roomview.set_wrap_mode(Gtk.WrapMode.WORD)
+        roomview.modify_bg(Gtk.StateType.NORMAL, Gdk.Color(0,0,0))
+        roomview.modify_fg(Gtk.StateType.NORMAL, Gdk.Color(65535,65535,65535))
         roombuffer = roomview.get_buffer()
         roombuffer.set_text("This is the room window\n")
         roomwindow.add(roomview)
@@ -273,20 +286,23 @@ class MyWindow(Gtk.Window):
     def entrytext_realize(self, widget):
         widget.grab_focus()
 
+    def send_prompt(self):
+        self.textbuffer2.insert(self.textbuffer2.get_end_iter(), ">\n")
+
     def read_input(self, source, condition):
         line = self.tn.read_very_eager()
         line = line.strip("\r\n")
         line = line.replace('"','\'')
         lines = line.split('\n')
         for line in lines:
-            line = TextLine(line, self.unmatched, self)
+            textobj = TextLine(line, self.unmatched, self)
             print("RETURNED")
-            if line.prompt:
-                self.textbuffer2.insert(self.textbuffer2.get_end_iter(), ">\n")
-            elif self.stream:
+            #if line.prompt:
+            #    self.send_prompt()
+            if self.stream:
                 pass
-            elif line.lines:
-                for line in line.lines:
+            elif textobj.lines:
+                for line in textobj.lines:
                     if line:
                         if re.match("^<color=", line):
                             color = re.match("^<color=(.+?)>", line).group(1)
@@ -299,19 +315,24 @@ class MyWindow(Gtk.Window):
                                 tag_red = self.textbuffer2.create_tag(foreground="#FF0000")
                                 self.textbuffer2.insert_with_tags(self.textbuffer2.get_end_iter(),
                                     text, tag_red)
-                        elif re.match("^<d>", line):
-                            text = re.match("^<d>(.+?)</d>", line).group(1)
-                            tag_red = self.textbuffer2.create_tag(foreground="#FF0000")
-                            self.textbuffer2.insert_with_tags(self.textbuffer2.get_end_iter(),
-                                text, tag_red)
+                        #elif re.match("^<d>", line):
+                        #    text = re.match("^<d>(.+?)</d>", line).group(1)
+                        #    tag_red = self.textbuffer2.create_tag(foreground="#FF0000")
+                        #    self.textbuffer2.insert_with_tags(self.textbuffer2.get_end_iter(),
+                        #        text, tag_red)
                         else:
                             self.textbuffer2.insert(self.textbuffer2.get_end_iter(),
                                 "{}".format(line))
-                self.textbuffer2.insert(self.textbuffer2.get_end_iter(),"\n")   
-            elif len(line.text) > 0:
-                self.textbuffer2.insert(self.textbuffer2.get_end_iter(), "{}\n".format(line.text))
-                
+                self.textbuffer2.insert(self.textbuffer2.get_end_iter(),"\n")
+            elif len(textobj.text) > 0:
+                self.textbuffer2.insert(self.textbuffer2.get_end_iter(), "{}\n".format(textobj.text))
+            if textobj.prompt and not self.stream:
+                self.send_prompt()
         return True
+
+    def add_thought(self, line):
+        self.thoughtbuffer.insert(self.thoughtbuffer.get_end_iter(),
+            "{}\n".format(line))
 
     def scrolledwindow2_changed(self, widget, event, data=None):
         adj = widget.get_vadjustment()
@@ -418,6 +439,13 @@ class MyWindow(Gtk.Window):
             if visible == "y":
                 self.posimg.set_from_file("images/stand.xpm")
         
+    def get_last_line(self):
+        iter_start = self.textbuffer2.get_iter_at_line(self.textbuffer2.get_line_count()-2)
+        iter_end = self.textbuffer2.get_iter_at_line(self.textbuffer2.get_line_count()-1)
+        lastline = self.textbuffer2.get_text(iter_start, iter_end, True)
+#        print("LAST LINE: ".format(lastline))
+        return lastline
+
 class TextLine:
     def __init__(self, line, unmatched, mainwindow):
         self.text = ''
@@ -436,15 +464,13 @@ class TextLine:
                 if re.match("(^<resource picture='.+'/>)",line):
                     line = re.sub("<resource picture='0'/>", "", line)
                 elif re.match("^<style id='(.+)' />", line):
-                    objs = re.match("^<style id='(.+)' />", line)
-                    self.style = objs.groups(0)
+                    match = re.match("^<style id='(.+)' />", line)
                     line = re.sub("^<style id='(.+)' />", "", line)
                 elif re.match("<style id=''/>", line):
                     line = re.sub("<style id=''/>", "", line)
                     self.text = line
                 elif re.match("^<preset id='([a-zA-Z]+)'>(.+)</preset>", line):
-                    objs = re.match("^<preset id='([a-zA-Z]+)'>(.+)</preset>", line)
-                    self.preset = objs.group(1)
+                    match = re.match("^<preset id='([a-zA-Z]+)'>(.+)</preset>", line)
                     line = re.sub("^<preset id='([a-zA-Z]+)'>", "", line)
                     line = re.sub("</preset>", "", line)
                 elif re.match("^<roundTime value='([0-9]+)'/>", line):
@@ -472,8 +498,21 @@ class TextLine:
                     if server_time != mainwindow.server_time:
                         print("SERVER CORRECTION: {} vs {}".format(server_time, mainwindow.server_time))
                         mainwindow.server_time = server_time
-                    self.prompt = True
-                    break
+                    line = re.sub("^<prompt time='([0-9]+)'>&gt;</prompt>", "", line)
+                    #if mainwindow.prompt:
+                    #    self.prompt = False
+                    #    mainwindow.prompt = True
+                    #else:
+                    #    self.prompt = True
+                    #    mainwindow.prompt = False
+                    #break
+                    lastline = mainwindow.get_last_line().strip()
+                    print("LASTLINE: {} ({})".format(lastline, len(lastline)))
+                    if lastline == ">":
+                        self.prompt = False
+                    else:
+                        self.prompt = True
+                    #print("LAST LINE: {}".format(lastline))
                 elif re.match("^<right>(.+?)</right>", line):
                     match = re.match("^<right>(.+?)</right>", line)
                     mainwindow.set_hand("right", match.group(1))
@@ -513,19 +552,63 @@ class TextLine:
                     line = re.sub("<inv id='stow'>.+?</inv>", "", line, count = 1)
                 elif re.match("^<clearStream id='inv' ifClosed=''/>", line):
                     line = re.sub("^<clearStream id='inv' ifClosed=''/>", "", line)
+                elif re.match("^<clearStream id='percWindow'/>", line):
+                    line = re.sub("^<clearStream id='percWindow'/>", "", line)
                 elif re.match("<pushStream id='inv'/>", line):
                     mainwindow.stream = True
+                    print("STREAMING INVENTORY")
                     line = re.sub("<pushStream id='inv'/>", "", line)
                 elif re.match("<popStream/>", line):
                     mainwindow.stream = False
+                    print("DONE STREAMING")
                     line = re.sub("<popStream/>", "", line)
+                elif re.match("<pushStream id='percWindow'/>", line):
+                    mainwindow.stream = True
+                    print("STREAMING PERCEIVE")
+                    line = re.sub("<pushStream id='percWindow'/>", "", line)
                 elif re.match("<compass>(.+)</compass>", line):
                     match = re.match("<compass>(.+)</compass>", line)
                     mainwindow.set_compass(match.group(1))
                     line = re.sub("<compass>(.+)</compass>", "", line)
+                elif re.match("^<pushStream id='thoughts'/>(.+)$", line):
+                    match = re.match("^<pushStream id='thoughts'/>(.+)$", line)
+                    mainwindow.add_thought(match.group(1))
+                    line = re.sub("^<pushStream id='thoughts'/>(.+)$", "", line)
+                elif re.match("^<component id='(.*?)'>(.*?)</component>", line):
+                    match = re.match("^<component id='(.*?)'>(.*?)</component>", line)
+                    componentid = match.group(1)
+                    value = match.group(2)
+                    print("COMPONENT: {}".format(value))
+                    line = re.sub("^<component id='(.*?)'>(.*?)</component>", "", line, count=1)
+                elif re.match("<streamWindow id='(.+?)' title='(.+?)' subtitle='(.+?)' location='(.+?)' target='(.+?)'/>", line):
+                    match = re.match("<streamWindow id='(.+?)' title='(.+?)' subtitle='(.+?)' location='(.+?)' target='(.+?)'/>", line)
+                    line = re.sub("<streamWindow id='(.+?)' title='(.+?)' subtitle='(.+?)' location='(.+?)' target='(.+?)'/>", "", line)
+                elif re.match("^<streamWindow id='(.+?)' title='(.+?)' subtitle='(.+?)' location='(.+?)' target='(.+?)' ifClosed='' resident='(.+?)'/>", line):
+                    match = re.match("^<streamWindow id='(.+?)' title='(.+?)' subtitle='(.+?)' location='(.+?)' target='(.+?)' ifClosed='' resident='(.+?)'/>", line)
+                    line = re.sub("^<streamWindow id='(.+?)' title='(.+?)' subtitle='(.+?)' location='(.+?)' target='(.+?)' ifClosed='' resident='(.+?)'/>", "", line)
+                elif re.match("^<nav/>", line):
+                    line = re.sub("<nav/>", "", line)
+                elif re.match("^<dialogData id='(.+?)'>(.+?)</dialogData>", line):
+                    match = re.match("^<dialogData id='(.+?)'>(.+?)</dialogData>", line)
+                    print("DIALOG DATA: {}".format(match.group(2)))
+                    line = re.sub("^<dialogData id='(.+?)'>(.+?)</dialogData>", "", line)
                 else:
                     unmatched.write("{}\n".format(line))
                     break
+            elif re.match ("^Also here:.+$", line):
+                print("ALSO HERE Processed: {}".format(line))
+                self.text = line
+                break
+            elif re.match("^\*", line):
+                self.text = line
+                break
+            elif re.match("^&lt;", line):
+                line = re.sub("^&lt;", "<", line)
+                self.text = line
+                break
+            elif re.match("^\[", line):
+                self.text = line
+                break
             else:
                 self.text = line
                 break

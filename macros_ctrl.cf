@@ -1,0 +1,9 @@
+p:northeast
+k:west
+i:northwest
+slash:southeast
+semicolon:east
+l:south
+comma:southwest
+o:north
+a:attack
